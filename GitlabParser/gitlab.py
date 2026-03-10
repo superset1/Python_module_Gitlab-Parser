@@ -10,7 +10,7 @@ class Find:
     '''Recursive parsing Gitlab'''
 
     gitlab_url = 'https://gitlab.com'
-    gitlab_token = os.environ['GITLAB_TOKEN_WRITE']
+    gitlab_token = os.getenv('GITLAB_TOKEN_WRITE')
     max_workers = os.cpu_count() * 10
 
     session = requests.Session()
