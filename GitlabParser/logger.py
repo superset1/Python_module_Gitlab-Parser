@@ -64,7 +64,3 @@ class Logger(object):
     def get_current_logger(cls):
         '''Get current logger'''
         return cls._current_logger
-
-def config(*args, **kwargs) -> logging.Logger:
-    """Shortcut function to get configured logger"""
-    return Logger().config(*args, **kwargs)

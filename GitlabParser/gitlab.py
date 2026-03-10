@@ -1,7 +1,6 @@
 import requests
 import os
 import concurrent.futures
-import logging
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from .logger import Logger
