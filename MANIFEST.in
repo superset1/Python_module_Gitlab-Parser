@@ -1,1 +1,4 @@
-recursive-exclude GitlabParser test*
+include LICENSE
+include README.md
+include pyproject.toml
+recursive-include tests *.py

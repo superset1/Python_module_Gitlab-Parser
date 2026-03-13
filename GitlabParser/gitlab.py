@@ -3,7 +3,7 @@ import os
 import concurrent.futures
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from .logger import Logger
+from cozy_logger import Logger
 
 class Find:
     '''Recursive parsing Gitlab'''

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "GitlabParser"
-version = "1.0.2"
+version = "1.0.3"
 license = {text = "MIT"}
 authors = [
     {name="Vitaly Kargin", email="super_set@mail.ru"},
@@ -16,6 +16,17 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+]
+dependencies = [
+    "requests>=2.25.0",
+    "packaging>=20.0",
+    "cozy_logger>=1.0"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
 ]
 
 [project.urls]
