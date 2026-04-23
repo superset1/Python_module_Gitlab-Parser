@@ -15,7 +15,7 @@ class Find:
     session = requests.Session()
     retries = Retry(total=10,
                     backoff_factor=0.1,
-                    status_forcelist=[500, 502, 503, 504],
+                    status_forcelist=[409, 500, 502, 503, 504],
                     allowed_methods=frozenset(['GET', 'POST']))
     session.mount('http://', HTTPAdapter(max_retries=retries))
     session.mount('https://', HTTPAdapter(max_retries=retries))
