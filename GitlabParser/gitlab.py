@@ -2,6 +2,7 @@ import requests
 import os
 import concurrent.futures
 from requests.adapters import HTTPAdapter
+from typing import Optional
 from urllib3.util.retry import Retry
 from cozy_logger import Logger
 
@@ -9,8 +10,8 @@ class Find:
     '''Recursive parsing Gitlab'''
 
     gitlab_url = 'https://gitlab.com'
-    gitlab_token = os.getenv('GITLAB_TOKEN_WRITE')
-    max_workers = os.cpu_count() * 10
+    gitlab_token = os.getenv('GITLAB_TOKEN_WRITE', '')
+    max_workers = (os.cpu_count() or 1) * 10
 
     session = requests.Session()
     retries = Retry(total=10,
@@ -28,7 +29,32 @@ class Find:
         self.max_workers = max_workers
 
     def find_all_groups(self, *, group_ids: list=[], exclude_groups_ids: list=[], with_projects: bool=True, recursive: bool=True) -> list:
-        '''Recursive search all groups'''
+        """Recursive search all groups.
+
+        Args:
+            List of group IDs to retrieve.
+                Defaults to [].
+            exclude_groups_ids (list, optional): Group IDs to exclude from results.
+                Defaults to [].
+            with_projects (bool, optional): If True, includes project data for each group.
+                If False, returns only group metadata (faster). Defaults to True.
+            recursive (bool, optional): If True, recursive search of all subgroups.
+                If False, only returns direct children. Defaults to True.
+
+        Returns:
+            list: List of group objects matching the search criteria.
+
+        Examples:
+            >>> find_all_groups()
+            [<Group 1>, <Group 2>, ...]
+
+            >>> find_all_groups(group_ids=[1, 2], with_projects=False)
+            [<Group 1>, <Group 2>]
+
+            >>> find_all_groups(exclude_groups_ids=[5, 10], recursive=False)
+            [<Group 1>, <Group 2>, ...]
+        """
+
         groups = []
         group_ids = [group_id for group_id in group_ids if group_id not in exclude_groups_ids]
 
@@ -96,11 +122,42 @@ class Find:
 
         return groups
 
-    def find_all_projects(self, *, group_ids: list=[], exclude_groups_ids: list=[], exclude_project_ids: list=[], recursive: bool=True, archived: bool='', with_shared: bool=False, shared: bool=False) -> list:
-        '''Recursive search all projects in groups'''
+    def find_all_projects(self, *, group_ids: list=[], project_ids: list=[], exclude_groups_ids: list=[], exclude_project_ids: list=[], recursive: bool=True, archived: Optional[bool] = None, with_shared: bool=False, shared: bool=False) -> list:
+        """Recursive search all projects in groups or specific projects.
+
+        Args:
+            group_ids (list, optional): List of group IDs to search in.
+                Defaults to empty list.
+            project_ids (list, optional): List of specific project IDs to fetch.
+                Defaults to empty list.
+            exclude_groups_ids (list, optional): Group IDs to exclude from search.
+                Defaults to empty list.
+            exclude_project_ids (list, optional): Project IDs to exclude from results.
+                Defaults to empty list.
+            recursive (bool, optional): If True, recursive search of all projects in subgroups.
+                Defaults to True.
+            archived (Optional[bool], optional): Filter by archived status.
+                If None, returns both archived and non-archived projects.
+                Defaults to None.
+            with_shared (bool, optional): If True, include shared projects from other groups.
+                Defaults to False.
+            shared (bool, optional): If True, return only shared projects.
+                Defaults to False.
+
+        Returns:
+            list: List of project objects matching the search criteria.
+
+        Examples:
+            >>> find_all_projects(group_ids=[1, 2], recursive=True)
+            [<Project 1>, <Project 2>, ...]
+
+            >>> find_all_projects(project_ids=[1, 2])
+            [<Project 1>, <Project 2>, ...]
+        """
+
         projects = []
 
-        if recursive:
+        if recursive and group_ids:
             group_ids = [group_data['id'] for group_data in self.find_all_groups(group_ids=group_ids, exclude_groups_ids=exclude_groups_ids)]
 
         def find_projects_in_group(group_id):
@@ -131,10 +188,35 @@ class Find:
 
                 page += 1
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for result in executor.map(find_projects_in_group, group_ids):
-                if result:
-                    self.logger.info(result)
+        def find_project(project_id):
+            url = f"{self.gitlab_url}/api/v4/projects/{project_id}"
+            response = self.session.get(url, headers=self.headers)
+
+            if response.status_code != 200:
+                self.logger.critical(f'Cannot get project id {project_id}. Status code is {response.status_code}.')
+                exit(1)
+
+            projects_data = response.json()
+            if len(projects_data) == 0:
+                return
+
+            if archived is None or archived == projects_data.get('archived'):
+                projects.append(projects_data)
+
+        if group_ids:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                for result in executor.map(find_projects_in_group, group_ids):
+                    if result:
+                        self.logger.info(result)
+
+        found_project_ids = [project['id'] for project in projects]
+        project_ids = [project_id for project_id in project_ids if project_id not in exclude_project_ids and project_id not in found_project_ids]
+
+        if project_ids:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                for result in executor.map(find_project, project_ids):
+                    if result:
+                        self.logger.info(result)
 
         return projects
 
